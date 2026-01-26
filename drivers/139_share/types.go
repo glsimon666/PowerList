@@ -1,64 +1,63 @@
 package _139_share
 
-import (
-	"github.com/OpenListTeam/OpenList/v4/internal/model"
-	"time"
-)
-
-type Folder struct {
-	Name      string `json:"caName"`
-	Path      string `json:"path"`
-	UpdatedAt string `json:"udTime"`
-}
-
-type File struct {
-	Name      string `json:"coName"`
-	Path      string `json:"path"`
-	Type      int    `json:"coType"`
-	Size      int64  `json:"coSize"`
-	UpdatedAt string `json:"udTime"`
-	IsDir     bool
-	Time      time.Time
-}
-
+// ListResp 适配getOutLinkInfoV6接口的响应结构
 type ListResp struct {
-	Success bool     `json:"success"`
-	Code    string   `json:"code"`
-	Desc    string   `json:"desc"`
-	Data    ListData `json:"data"`
+	Code string `json:"code"`
+	Desc string `json:"desc"`
+	Data struct {
+		Count   int `json:"count"`
+		Next    string `json:"next"`
+		Folders []struct {
+			Name      string `json:"name"`
+			Path      string `json:"path"`
+			UpdatedAt string `json:"updatedAt"`
+		} `json:"folders"`
+		Files []File `json:"files"`
+	} `json:"data"`
 }
 
-type ListData struct {
-	Count   int64    `json:"nodNum"`
-	Next    string   `json:"nextPageCursor"`
-	Folders []Folder `json:"caLst"`
-	Files   []File   `json:"coLst"`
+// File 文件/文件夹结构体
+type File struct {
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	UpdatedAt string `json:"updatedAt"`
+	IsDir     bool   `json:"isDir"`
+	Time      string `json:"-"` // 用于时间解析的临时字段
+	ID        string `json:"id"` // 文件ID，用于获取下载链接
+	Size      int64  `json:"size"`
 }
 
+// LinkResp 适配IOutLink/getDownloadUrl接口的响应结构
 type LinkResp struct {
 	Success bool     `json:"success"`
 	Code    string   `json:"code"`
-	Desc    string   `json:"desc"`
+	Message string   `json:"message"`
 	Data    LinkData `json:"data"`
 }
 
+// LinkData 响应中data字段的结构
 type LinkData struct {
-	Url     string  `json:"redrUrl"`
-	ExtInfo ExtInfo `json:"extInfo"`
+	CdnDownLoadUrl       string `json:"cdnDownLoadUrl"`
+	ContentHash          string `json:"contentHash"`
+	ContentHashAlgorithm string `json:"contentHashAlgorithm"`
+	DownLoadUrl          string `json:"downLoadUrl"`
 }
 
-type ExtInfo struct {
-	Url string `json:"cdnDownloadUrl"`
+// GetDownloadUrlReq 下载链接请求体结构
+type GetDownloadUrlReq struct {
+	LinkID             string `json:"linkID"`
+	Account            string `json:"account"`
+	CoIDLst            CoIDLst `json:"coIDLst"`
+	CommonAccountInfo  CommonAccountInfo `json:"commonAccountInfo"`
 }
 
-func fileToObj(f File) *model.ObjThumb {
-	return &model.ObjThumb{
-		Object: model.Object{
-			ID:       f.Path,
-			Name:     f.Name,
-			Modified: f.Time,
-			Size:     f.Size,
-			IsFolder: f.IsDir,
-		},
-	}
+// CoIDLst 请求体中的coIDLst字段
+type CoIDLst struct {
+	Item []string `json:"item"`
+}
+
+// CommonAccountInfo 请求体中的commonAccountInfo字段
+type CommonAccountInfo struct {
+	Account     string `json:"account"`
+	AccountType int    `json:"accountType"`
 }
