@@ -18,6 +18,20 @@ type Yun139Share struct {
 	Addition
 }
 
+// fileToObj 转换File到model.Obj
+func fileToObj(src File) model.Obj {
+	size, _ := utils.ParseSize(src.Size)
+	modified, _ := time.Parse(time.RFC3339, src.Time)
+	return &model.Object{
+		ID:       src.ID,
+		Name:     src.Name,
+		Size:     size,
+		Modified: modified,
+		IsFolder: src.IsDir,
+		Path:     src.Path,
+	}
+}
+
 func (d *Yun139Share) Config() driver.Config {
 	return config
 }
