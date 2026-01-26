@@ -128,13 +128,13 @@ func (y *Yun139Share) list(pCaID string) ([]File, error) {
 				IsDir: true,
 			}
 			parsedTime, _ := time.Parse("20250416195740", f.UpdatedAt)
-			file.Time = parsedTime
+			file.Time = parsedTime.Format(time.RFC3339)
 			files = append(files, file)
 		}
 
 		for _, f := range res.Data.Files {
 			parsedTime, _ := time.Parse("20250416195740", f.UpdatedAt)
-			f.Time = parsedTime
+			f.Time = parsedTime.Format(time.RFC3339)
 			f.IsDir = false
 			files = append(files, f)
 		}
@@ -151,17 +151,15 @@ func (y *Yun139Share) list(pCaID string) ([]File, error) {
 
 func (y *Yun139Share) link(yun139 *_139.Yun139, fid string) (string, error) {
 	account := yun139.Account
-	params := map[string]interface{}{
-		"dlFromOutLinkReqV3": map[string]interface{}{
-			"linkID":  y.ShareId,
-			"account": account,
-			"coIDLst": map[string]interface{}{
-				"item": []string{fid},
-			},
+	params := GetDownloadUrlReq{
+		LinkID:  y.ShareId,
+		Account: account,
+		CoIDLst: CoIDLst{
+			Item: []string{fid},
 		},
-		"commonAccountInfo": map[string]interface{}{
-			"account":     account,
-			"accountType": 1,
+		CommonAccountInfo: CommonAccountInfo{
+			Account:     account,
+			AccountType: 1,
 		},
 	}
 
@@ -190,15 +188,21 @@ func (y *Yun139Share) link(yun139 *_139.Yun139, fid string) (string, error) {
 		return "", err
 	}
 
-	if res.Code != "0" {
-		return "", errors.New(res.Desc)
+	// 校验响应状态
+	if !res.Success || res.Code != "0000" {
+		return "", errors.New("获取下载链接失败: " + res.Message)
 	}
 
 	log.Debugf("link result: %v", decrypted)
-	url := res.Data.ExtInfo.Url
+	
+	// 优先取downLoadUrl，cdnDownLoadUrl兜底
+	url := res.Data.DownLoadUrl
+	if url == "" {
+		url = res.Data.CdnDownLoadUrl
+	}
 
-	if len(url) == 0 {
-		url = res.Data.Url
+	if url == "" {
+		return "", errors.New("响应中未获取到有效下载链接")
 	}
 
 	return url, nil
