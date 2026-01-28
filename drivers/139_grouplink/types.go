@@ -3,19 +3,20 @@ package _139_grouplink
 import (
 	"time"
 
-	"github.com/OpenListTeam/OpenList/v4/pkg/utils" // 新增：导入utils包，适配HashInfo类型
+	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 )
 
-// GetOutLinkInfoReq 接口请求体
+// GetOutLinkInfoReq 接口请求体【核心修复：PCaID的json tag】
 type GetOutLinkInfoReq struct {
-	LinkID  string `json:"linkId"`  // 分享链接ID（如2sNZX0hQL8q9m）
-	Passwd  string `json:"passwd"`  // 分享密码（如qmo9）
-	PCaID   string `json:"pCaID"`   // 目录ID，根目录为空或root
-	BNum    int    `json:"bNum"`    // 起始条数
-	ENum    int    `json:"eNum"`    // 结束条数
+	LinkID  string `json:"linkId"`  // 正确：和接口一致（小写l）
+	Passwd  string `json:"passwd"`  // 正确：和接口一致
+	PCaID   string `json:"pCaId"`   // 致命修复：从pCaID→pCaId（最后一位d小写），和接口完全匹配
+	BNum    int    `json:"bNum"`    // 正确：和接口一致
+	ENum    int    `json:"eNum"`    // 正确：和接口一致
 }
 
-// GetOutLinkInfoResp 接口响应体
+// 以下所有代码完全不变，保留原有实现
 type GetOutLinkInfoResp struct {
 	Success bool   `json:"success"`
 	Code    string `json:"code"`
@@ -26,28 +27,26 @@ type GetOutLinkInfoResp struct {
 		IsCreator      string      `json:"isCreator"`
 		OutLink        OutLink     `json:"outLink"`
 		NextPageCursor interface{} `json:"nextPageCursor"` // 分页游标
-		PcaId          string      `json:"pcaId"`
+		PcaId          string      `json:"pCaId"`          // 接口返回的pCaId（和请求体一致）
 	} `json:"data"`
 }
 
-// Assets 资源项（文件）
 type Assets struct {
-	AssetsId      string      `json:"assetsId"`   // 文件ID
-	AssetsName    string      `json:"assetsName"` // 文件名
+	AssetsId      string      `json:"assetsId"`
+	AssetsName    string      `json:"assetsName"`
 	Category      int         `json:"category"`
 	CoType        int         `json:"coType"`
-	CoSuffix      string      `json:"coSuffix"`   // 文件后缀
-	CoSize        int64       `json:"coSize"`     // 文件大小（字节）
-	UdTime        string      `json:"udTime"`     // 更新时间（20250203164249）
+	CoSuffix      string      `json:"coSuffix"`
+	CoSize        int64       `json:"coSize"`
+	UdTime        string      `json:"udTime"`
 	ThumbnailURL  string      `json:"thumbnailURL"`
 	BthumbnailURL string      `json:"bthumbnailURL"`
-	PresentURL    string      `json:"presentURL"` // 播放/下载链接
-	Path          string      `json:"path"`       // 文件路径
-	IsDir         bool        `json:"-"`          // 是否为文件夹（139分组链接暂未返回文件夹，默认false）
-	Time          time.Time   `json:"-"`          // 解析后的时间
+	PresentURL    string      `json:"presentURL"`
+	Path          string      `json:"path"`
+	IsDir         bool        `json:"-"`
+	Time          time.Time   `json:"-"`
 }
 
-// OutLink 分享链接基础信息
 type OutLink struct {
 	LinkId     string `json:"linkId"`
 	LinkCode   string `json:"linkCode"`
@@ -59,18 +58,16 @@ type OutLink struct {
 	LastUdTime string `json:"lastUdTime"`
 }
 
-// File 适配PowerList model.Obj的文件结构体
 type File struct {
 	Name      string
 	Path      string
 	Size      int64
 	ID        string
-	IsDirFlag bool // 解决与IsDir()方法的命名冲突
+	IsDirFlag bool
 	Time      time.Time
-	URL       string // 播放/下载链接
+	URL       string
 }
 
-// 实现model.Obj接口的必要方法
 func (f File) GetID() string {
 	return f.ID
 }
@@ -99,12 +96,10 @@ func (f File) CreateTime() time.Time {
 	return f.Time
 }
 
-// 修改：返回utils.HashInfo结构体（而非string），139grouplink无hash，返回空结构体兜底
 func (f File) GetHash() utils.HashInfo {
 	return utils.HashInfo{}
 }
 
-// fileToObj 转换为PowerList标准model.Obj
 func fileToObj(src Assets) File {
 	parsedTime, _ := time.Parse("20060102150405", src.UdTime)
 	return File{
