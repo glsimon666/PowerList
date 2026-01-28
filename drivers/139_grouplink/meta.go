@@ -38,9 +38,9 @@ func (d *Yun139GroupLink) Config() driver.Config {
 	return config
 }
 
-// 新增：实现driver.Driver必需的GetStorage方法（解决编译错误）
-func (d *Yun139GroupLink) GetStorage() model.Storage {
-	return d.Storage
+// 修改：GetStorage返回*model.Storage（指针类型），匹配driver.Driver接口要求
+func (d *Yun139GroupLink) GetStorage() *model.Storage {
+	return &d.Storage
 }
 
 // 初始化注册驱动
@@ -49,4 +49,3 @@ func init() {
 		return &Yun139GroupLink{}
 	})
 }
-
