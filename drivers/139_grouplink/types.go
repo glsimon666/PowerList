@@ -59,6 +59,7 @@ type OutLink struct {
 	LkName     string `json:"lkName"`
 	CtTime     string `json:"ctTime"`
 	LastUdTime string `json:"lastUdTime"`
+	OwnerUserId string `json:"ownerUserId"` // 新增：分享者用户ID，用于下载接口的userDomainId
 }
 
 type File struct {
