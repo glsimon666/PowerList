@@ -15,44 +15,38 @@ import (
 const apiBase = "https://share-kd-njs.yun.139.com/yun-share/general/IOutLink/"
 var idx int32 = 0
 
-// ---------------------- 新增：grouplink专属下载接口 结构体 ----------------------
-// GetDownloadUrlReq getDownloadUrl接口请求体（贴合Scheme，精简）
+// ---------------------- grouplink专属下载接口 结构体 ----------------------
 type GetDownloadUrlReq struct {
-	LinkID  string `json:"linkID"`  // 分组分享ID（grouplink的ShareId）
-	CoIDLst CoIDLst `json:"coIDLst"`// 文件ID列表
+	LinkID  string `json:"linkID"`
+	CoIDLst CoIDLst `json:"coIDLst"`
 }
-// CoIDLst 139生态通用的文件ID列表结构
 type CoIDLst struct {
-	Item []string `json:"item"` // 文件ID数组，单个文件也传数组
+	Item []string `json:"item"`
 }
-
-// GetDownloadUrlResp getDownloadUrl接口响应体（贴合Scheme，精简）
 type GetDownloadUrlResp struct {
 	Success bool   `json:"success"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Data    struct {
-		DownloadURL string `json:"downloadURL"` // 核心高速下载直链
+		DownloadURL string `json:"downloadURL"`
 	} `json:"data"`
 }
-// ---------------------- 新增结束 ----------------------
+// ---------------------- 结构体结束 ----------------------
 
 // httpPost 封装POST请求（保留auth参数，鉴权开关）
 func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool) ([]byte, error) {
 	u := apiBase + pathname
 	req := base.RestyClient.R()
 
-	// 请求头：贴合抓包，保留必选头，x-share-channel=0102（抓包固定值）
 	req.SetHeaders(map[string]string{
 		"Content-Type":     "application/json;charset=utf-8",
 		"Referer":          "https://yun.139.com/",
 		"User-Agent":       "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
 		"Origin":           "https://yun.139.com",
-		"x-share-channel":  "0102", // 抓包固定值，接口硬要求
+		"x-share-channel":  "0102", // 抓包固定值
 		"hcy-cool-flag":    "1",
 	})
 
-	// 鉴权逻辑：复用原有，auth=true时自动添加139Yun的Authorization
 	if auth {
 		driverIdx := int(atomic.LoadInt32(&idx) % int32(op.GetDriverCount("139Yun")))
 		driver := op.GetFirstDriver("139Yun", driverIdx)
@@ -79,35 +73,29 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 	return res.Body(), nil
 }
 
-// ---------------------- 新增：grouplink专属下载接口调用方法 ----------------------
 // getDownloadUrl 调用抓包的专属下载接口，带鉴权，返回高速直链
 func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
-	// 1. 构造请求体（贴合Scheme，linkID=当前分组的ShareId）
 	req := GetDownloadUrlReq{
 		LinkID: y.ShareId,
 		CoIDLst: CoIDLst{
-			Item: []string{fid}, // 单个文件ID，按139规范传数组
+			Item: []string{fid},
 		},
 	}
 
-	// 2. 调用接口：auth=true（自动添加Authorization鉴权头），无加解密
 	respBody, err := y.httpPost("getDownloadUrl", req, true)
 	if err != nil {
 		return "", fmt.Errorf("下载接口请求失败：%v", err)
 	}
 
-	// 3. 解析明文响应体（无解密，直接解析）
 	var resp GetDownloadUrlResp
 	if err := json.Unmarshal(respBody, &resp); err != nil {
 		return "", fmt.Errorf("下载响应解析失败：%v，body：%s", err, string(respBody))
 	}
 
-	// 4. 判断是否成功（和list接口一致的判断逻辑，减少冗余）
 	if !resp.Success || resp.Code != "0000" {
 		return "", fmt.Errorf("下载接口返回错误：%s（码：%s）", resp.Message, resp.Code)
 	}
 
-	// 5. 校验直链是否有效
 	if resp.Data.DownloadURL == "" {
 		return "", errors.New("下载接口未返回有效高速直链")
 	}
@@ -115,21 +103,22 @@ func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
 	log.Debugf("grouplink专属接口获取高速直链成功：%s", resp.Data.DownloadURL)
 	return resp.Data.DownloadURL, nil
 }
-// ---------------------- 新增结束 ----------------------
 
 // getShareInfo 调用getOutLinkInfo接口获取分享信息【无鉴权】
 func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoResp, error) {
 	var resp GetOutLinkInfoResp
-	size := 200
-	start := page*size + 1
-	end := (page + 1) * size
+	size := 200 // 每页条数不变
+	// ---------------------- 核心修复：2行分页计算，去掉+1，从0开始 ----------------------
+	start := page * size // page=0时start=0（符合接口要求），page=1时start=200，以此类推
+	end := (page + 1) * size - 1 // 配套调整end，让区间为[0,199]、[200,399]，贴合接口分页规范
+	// ---------------------- 修复结束 ----------------------
 
 	reqBody := GetOutLinkInfoReq{
 		LinkID: y.ShareId,
 		Passwd: y.SharePwd,
 		PCaID:  pCaID,
-		BNum:   start,
-		ENum:   end,
+		BNum:   start, // 传修正后的起始值
+		ENum:   end,   // 传修正后的结束值
 	}
 
 	body, err := y.httpPost("getOutLinkInfo", reqBody, false)
@@ -157,7 +146,7 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 	}
 
 	files := make([]File, 0)
-	page := 0
+	page := 0 // 初始值0不变
 
 	for {
 		res, err := y.getShareInfo(actualID, page)
@@ -170,6 +159,7 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 			files = append(files, file)
 		}
 
+		// 分页终止条件不变，接口返回空游标则停止
 		if res.Data.NextPageCursor == nil || res.Data.NextPageCursor == "" {
 			break
 		}
