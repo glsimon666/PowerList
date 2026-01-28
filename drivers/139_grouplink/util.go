@@ -149,61 +149,48 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 
 // list 获取文件列表【仅新增1行：保存userDomainId，其余完全保留上一轮修复代码】
 func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
-	var actualID string
 	files := make([]File, 0)
-	page := 0 // 初始值0不变
-
-	if pCaID == "" || pCaID == "root" {
-		// 根目录场景：传空PCaId探活，获取接口返回的真实根pCaId
-		probeResp, err := y.getShareInfo("", 0)
-		if err != nil {
-			return nil, fmt.Errorf("根目录探活获取pCaId失败：%v", err)
-		}
-		// 校验接口返回的根pCaId是否有效
-		if probeResp.Data.PcaId == "" {
-			return nil, errors.New("接口未返回有效根目录pCaId")
-		}
-		actualID = probeResp.Data.PcaId // 用接口返回的真实pCaId作为后续查询的ID
-		// ---------------------- 新增1行：保存userDomainId，从outLink.ownerUserId获取 ----------------------
-		y.UserDomainId = probeResp.Data.OutLink.OwnerUserId
-		// ----------------------------------------------------------------------------------------
-		log.Debugf("根目录探活成功，获取真实pCaId：%s，userDomainId：%s", actualID, y.UserDomainId)
-
-		// 把探活调用的第一页数据直接加入文件列表，避免重复查询
-		for _, asset := range probeResp.Data.AssetsList {
-			file := fileToObj(asset)
-			files = append(files, file)
-		}
-		// 探活后如果有下一页，page直接置1，继续查询
-		if probeResp.Data.NextPageCursor == nil || probeResp.Data.NextPageCursor == "" {
-			log.Debugf("根目录仅1页数据，共%d个文件", len(files))
-			return files, nil
-		}
-		page = 1
-	} else {
-		// 非根目录场景：保留原有逻辑，直接用传入的pCaID
-		actualID = pCaID
+	// 步骤1：传pCaId="root"探活，获取根目录下的真实子目录ID（完全贴合抓包）
+	probeResp, err := y.getShareInfo("root", 0) // page=0 → 接口pageNum=1，和抓包一致
+	if err != nil {
+		return nil, fmt.Errorf("根目录探活获取子目录ID失败：%v", err)
 	}
+	// 校验探活响应：必须有assetsList且长度≥1（抓包返回1个）
+	if len(probeResp.Data.AssetsList) == 0 {
+		return nil, errors.New("探活响应未返回任何目录/文件项")
+	}
+	// 从assetsList[0].assetsId获取真实的文件目录ID（抓包的核心关键）
+	realPCaId := probeResp.Data.AssetsList[0].AssetsId
+	if realPCaId == "" {
+		return nil, errors.New("探活响应未返回有效真实pCaId")
+	}
+	log.Debugf("根目录探活成功，获取真实文件目录ID：%s", realPCaId)
 
-	// 非根目录分页查询 / 根目录后续页查询（通用逻辑，完全保留）
+	// 步骤2：首次查询（探活）成功，保存userDomainId（供下载接口使用，保留原有正确逻辑）
+	y.UserDomainId = probeResp.Data.OutLink.OwnerUserId
+	log.Debugf("探活成功，获取userDomainId：%s", y.UserDomainId)
+
+	// 步骤3：用真实文件目录ID二次查询，获取最终的文件列表（分页查询，保留原有正确分页逻辑）
+	page := 0
 	for {
-		res, err := y.getShareInfo(actualID, page)
+		res, err := y.getShareInfo(realPCaId, page)
 		if err != nil {
-			return nil, fmt.Errorf("分页查询失败（page=%d）：%v", page, err)
+			return nil, fmt.Errorf("真实目录分页查询失败（page=%d）：%v", page, err)
 		}
 
+		// 拼接文件列表（保留原有正确的File转换逻辑）
 		for _, asset := range res.Data.AssetsList {
 			file := fileToObj(asset)
 			files = append(files, file)
 		}
 
-		// 无下一页则终止
+		// 无下一页则终止（保留原有正确的分页终止逻辑）
 		if res.Data.NextPageCursor == nil || res.Data.NextPageCursor == "" {
 			break
 		}
 		page++
 	}
 
-	log.Debugf("获取到%d个文件", len(files))
+	log.Debugf("文件列表查询成功，共获取%d个文件", len(files))
 	return files, nil
 }
