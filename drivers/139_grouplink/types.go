@@ -65,7 +65,7 @@ type File struct {
 	Path      string
 	Size      int64
 	ID        string
-	IsDirFlag bool // 仅修改：字段重命名，解决与IsDir()方法的命名冲突
+	IsDirFlag bool // 解决与IsDir()方法的命名冲突
 	Time      time.Time
 	URL       string // 播放/下载链接
 }
@@ -88,30 +88,32 @@ func (f File) GetPath() string {
 }
 
 func (f File) IsDir() bool {
-	return f.IsDirFlag // 仅修改：返回重命名后的字段
+	return f.IsDirFlag
 }
 
 func (f File) ModTime() time.Time {
 	return f.Time
 }
 
-// 新增：实现model.Obj必需的CreateTime方法（解决编译错误）
 func (f File) CreateTime() time.Time {
 	return f.Time
 }
 
+// 新增：实现model.Obj必需的GetHash方法（139分组链接无hash，返回空字符串）
+func (f File) GetHash() string {
+	return ""
+}
+
 // fileToObj 转换为PowerList标准model.Obj
 func fileToObj(src Assets) File {
-	// 解析时间（格式：20250203164249）
 	parsedTime, _ := time.Parse("20060102150405", src.UdTime)
 	return File{
 		ID:        src.AssetsId,
 		Name:      src.AssetsName,
 		Size:      src.CoSize,
 		Path:      src.Path,
-		IsDirFlag: false, // 仅修改：赋值给重命名后的字段
+		IsDirFlag: false,
 		Time:      parsedTime,
 		URL:       src.PresentURL,
 	}
 }
-
