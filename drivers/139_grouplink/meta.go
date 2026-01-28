@@ -43,9 +43,14 @@ func (d *Yun139GroupLink) GetStorage() *model.Storage {
 	return &d.Storage
 }
 
-// 修复：SetStorage参数改为值类型model.Storage（接口要求），直接赋值即可
+// SetStorage 参数改为值类型model.Storage（接口要求），直接赋值即可
 func (d *Yun139GroupLink) SetStorage(s model.Storage) {
 	d.Storage = s
+}
+
+// 新增：实现IRootId根目录接口（框架挂载必需），返回配置的RootID（默认root）
+func (d *Yun139GroupLink) GetRootId() string {
+	return d.RootID
 }
 
 // 初始化注册驱动
