@@ -107,15 +107,17 @@ func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
 // getShareInfo 调用getOutLinkInfo接口获取分享信息【无鉴权】
 func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoResp, error) {
 	var resp GetOutLinkInfoResp
-	size := 200 // 每页条数不变
-	// 分页计算：从0开始，左闭右闭区间，贴合接口规范
-	start := page*size + 1 // page=0 → start=1（第一页起始，符合接口要求）
-	end := (page + 1) * size // page=0 → end=200（第一页结束，左闭右开，适配接口）
+	// ---------------------- 仅改这3行：适配接口pageSize限制，最大100条/页 ----------------------
+	size := 100 // 核心修改：从200改为100，贴合接口最大pageSize限制
+	start := page*size + 1 // page=0→1，page=1→101，依次类推（pageNum合法）
+	end := (page + 1) * size // page=0→100，page=1→200（pageSize=100，合法）
+	// ---------------------- 修改结束 ----------------------
+	// 分页规则：左闭右开[start,end)，实际条数=end-start=100，完全符合接口要求
 
 	reqBody := GetOutLinkInfoReq{
 		LinkID: y.ShareId,
 		Passwd: y.SharePwd,
-		PCaID:  pCaID, // 现在传的是有效pCaId，非空
+		PCaID:  pCaID, // tag已修复，接口能识别
 		BNum:   start,
 		ENum:   end,
 	}
