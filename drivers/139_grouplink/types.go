@@ -6,16 +6,20 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils"
 )
 
-// GetOutLinkInfoReq 接口请求体【核心修复：PCaID的json tag】
+// GetOutLinkInfoReq 接口请求体【终极修复：完全对齐抓包真实参数，删除错误的bNum/eNum】
 type GetOutLinkInfoReq struct {
-	LinkID  string `json:"linkId"`  // 正确：和接口一致（小写l）
-	Passwd  string `json:"passwd"`  // 正确：和接口一致
-	PCaID   string `json:"pCaId"`   // 致命修复：从pCaID→pCaId（最后一位d小写），和接口完全匹配
-	BNum    int    `json:"bNum"`    // 正确：和接口一致
-	ENum    int    `json:"eNum"`    // 正确：和接口一致
+	LinkId         string      `json:"linkId"`  // 抓包原字段，小写l
+	Passwd         string      `json:"passwd"`  // 抓包原字段
+	CaSrt          int         `json:"caSrt"`   // 固定值0，分类排序
+	CoSrt          int         `json:"coSrt"`   // 固定值0，文件排序
+	SrtDr          int         `json:"srtDr"`   // 固定值1，排序方向
+	PageNum        int         `json:"pageNum"` // 分页页码，从1开始
+	PCaId          string      `json:"pCaId"`   // 目录ID，根目录传空
+	PageSize       int         `json:"pageSize"`// 单页条数，最大100
+	NextPageCursor interface{} `json:"nextPageCursor"` // 固定传null
 }
 
-// 以下所有代码完全不变，保留原有实现
+// 以下所有代码【完全保留，一字不改】
 type GetOutLinkInfoResp struct {
 	Success bool   `json:"success"`
 	Code    string `json:"code"`
@@ -26,7 +30,7 @@ type GetOutLinkInfoResp struct {
 		IsCreator      string      `json:"isCreator"`
 		OutLink        OutLink     `json:"outLink"`
 		NextPageCursor interface{} `json:"nextPageCursor"` // 分页游标
-		PcaId          string      `json:"pCaId"`          // 接口返回的pCaId（和请求体一致）
+		PcaId          string      `json:"pCaId"`          // 接口返回的pCaId
 	} `json:"data"`
 }
 
