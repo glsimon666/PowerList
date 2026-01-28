@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/utils" // 新增：导入utils包，适配HashInfo类型
 )
 
 // GetOutLinkInfoReq 接口请求体
@@ -99,9 +100,9 @@ func (f File) CreateTime() time.Time {
 	return f.Time
 }
 
-// 新增：实现model.Obj必需的GetHash方法（139分组链接无hash，返回空字符串）
-func (f File) GetHash() string {
-	return ""
+// 修改：返回utils.HashInfo结构体（而非string），139grouplink无hash，返回空结构体兜底
+func (f File) GetHash() utils.HashInfo {
+	return utils.HashInfo{}
 }
 
 // fileToObj 转换为PowerList标准model.Obj
