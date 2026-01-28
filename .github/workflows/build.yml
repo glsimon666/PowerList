@@ -2,7 +2,7 @@ name: Test Build
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ["139_grouplink"]
   workflow_dispatch:
 
 concurrency:
