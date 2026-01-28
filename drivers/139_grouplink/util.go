@@ -108,17 +108,16 @@ func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
 func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoResp, error) {
 	var resp GetOutLinkInfoResp
 	size := 200 // 每页条数不变
-	// ---------------------- 核心修复：2行分页计算，去掉+1，从0开始 ----------------------
-	start := page * size // page=0时start=0（符合接口要求），page=1时start=200，以此类推
-	end := (page + 1) * size - 1 // 配套调整end，让区间为[0,199]、[200,399]，贴合接口分页规范
-	// ---------------------- 修复结束 ----------------------
+	// 分页计算：从0开始，左闭右闭区间，贴合接口规范
+	start := page * size
+	end := (page + 1) * size - 1
 
 	reqBody := GetOutLinkInfoReq{
 		LinkID: y.ShareId,
 		Passwd: y.SharePwd,
-		PCaID:  pCaID,
-		BNum:   start, // 传修正后的起始值
-		ENum:   end,   // 传修正后的结束值
+		PCaID:  pCaID, // 现在传的是有效pCaId，非空
+		BNum:   start,
+		ENum:   end,
 	}
 
 	body, err := y.httpPost("getOutLinkInfo", reqBody, false)
@@ -138,20 +137,48 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 	return resp, nil
 }
 
-// list 获取分享文件列表（分页）
+// list 获取分享文件列表（分页）【核心修改：根目录先探活获取真实pCaId，禁止传空】
 func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
-	actualID := pCaID
-	if pCaID == "" || pCaID == "root" {
-		actualID = ""
-	}
-
+	var actualID string
 	files := make([]File, 0)
 	page := 0 // 初始值0不变
 
+	// ---------------------- 核心修复：根目录处理逻辑，禁止传空pCaId ----------------------
+	if pCaID == "" || pCaID == "root" {
+		// 根目录场景：先做一次探活调用（page=0，传临时占位符"root"），获取接口返回的真实根pCaId
+		probeResp, err := y.getShareInfo("root", 0)
+		if err != nil {
+			return nil, fmt.Errorf("根目录探活获取pCaId失败：%v", err)
+		}
+		// 校验接口返回的根pCaId是否有效，避免接口返回空
+		if probeResp.Data.PcaId == "" {
+			return nil, errors.New("接口未返回有效根目录pCaId")
+		}
+		actualID = probeResp.Data.PcaId // 用接口返回的真实pCaId作为后续查询的ID
+		log.Debugf("根目录探活成功，获取真实pCaId：%s", actualID)
+
+		// 把探活调用的第一页数据直接加入文件列表，避免重复查询
+		for _, asset := range probeResp.Data.AssetsList {
+			file := fileToObj(asset)
+			files = append(files, file)
+		}
+		// 探活后如果有下一页，page直接置1，继续查询
+		if probeResp.Data.NextPageCursor == nil || probeResp.Data.NextPageCursor == "" {
+			log.Debugf("根目录仅1页数据，共%d个文件", len(files))
+			return files, nil
+		}
+		page = 1
+	} else {
+		// 非根目录场景：保留原有逻辑，直接用传入的pCaID
+		actualID = pCaID
+	}
+	// ---------------------- 根目录修复结束 ----------------------
+
+	// 非根目录分页查询 / 根目录后续页查询（通用逻辑，无修改）
 	for {
 		res, err := y.getShareInfo(actualID, page)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("分页查询失败（page=%d）：%v", page, err)
 		}
 
 		for _, asset := range res.Data.AssetsList {
@@ -159,7 +186,7 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 			files = append(files, file)
 		}
 
-		// 分页终止条件不变，接口返回空游标则停止
+		// 无下一页则终止
 		if res.Data.NextPageCursor == nil || res.Data.NextPageCursor == "" {
 			break
 		}
