@@ -3,7 +3,6 @@ package _139_grouplink
 import (
 	"time"
 
-	"github.com/OpenListTeam/OpenList/v4/internal/model"
 	"github.com/OpenListTeam/OpenList/v4/pkg/utils" // 新增：导入utils包，适配HashInfo类型
 )
 
