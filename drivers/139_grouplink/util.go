@@ -33,7 +33,7 @@ type GetDownloadUrlResp struct {
 }
 // ---------------------- 结构体结束 ----------------------
 
-// httpPost 封装POST请求（保留auth参数，鉴权开关）
+// httpPost 封装POST请求（保留auth参数，鉴权开关）【完全保留，一字不改】
 func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool) ([]byte, error) {
 	u := apiBase + pathname
 	req := base.RestyClient.R()
@@ -73,7 +73,7 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 	return res.Body(), nil
 }
 
-// getDownloadUrl 调用抓包的专属下载接口，带鉴权，返回高速直链
+// getDownloadUrl 专属下载接口【完全保留，一字不改】
 func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
 	req := GetDownloadUrlReq{
 		LinkID: y.ShareId,
@@ -104,24 +104,23 @@ func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
 	return resp.Data.DownloadURL, nil
 }
 
-// getShareInfo 调用getOutLinkInfo接口获取分享信息【无鉴权】
+// getShareInfo 调用getOutLinkInfo【终极修复：适配新的请求参数，删除错误的bNum/eNum】
 func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoResp, error) {
 	var resp GetOutLinkInfoResp
-	// ---------------------- 仅改这3行：适配接口pageSize限制，最大100条/页 ----------------------
-	size := 100 // 核心修改：从200改为100，贴合接口最大pageSize限制
-	start := page*size + 1 // page=0→1，page=1→101，依次类推（pageNum合法）
-	end := (page + 1) * size // page=0→100，page=1→200（pageSize=100，合法）
-	// ---------------------- 修改结束 ----------------------
-	// 分页规则：左闭右开[start,end)，实际条数=end-start=100，完全符合接口要求
-
+	// 构造抓包的固定参数，完全对齐接口要求
 	reqBody := GetOutLinkInfoReq{
-		LinkID: y.ShareId,
-		Passwd: y.SharePwd,
-		PCaID:  pCaID, // tag已修复，接口能识别
-		BNum:   start,
-		ENum:   end,
+		LinkId:         y.ShareId,
+		Passwd:         y.SharePwd,
+		CaSrt:          0,          // 抓包固定值
+		CoSrt:          0,          // 抓包固定值
+		SrtDr:          1,          // 抓包固定值
+		PageNum:        page + 1,   // 框架page从0开始 → 接口PageNum从1开始
+		PCaId:          pCaID,      // 目录ID，根目录传空
+		PageSize:       100,        // 接口最大支持100
+		NextPageCursor: nil,        // 抓包固定值null
 	}
 
+	// 以下请求逻辑【完全保留】
 	body, err := y.httpPost("getOutLinkInfo", reqBody, false)
 	if err != nil {
 		return resp, err
@@ -139,20 +138,20 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 	return resp, nil
 }
 
-// list 获取分享文件列表（分页）【核心修改：根目录先探活获取真实pCaId，禁止传空】
+// list 获取文件列表【仅微调1处：探活传空PCaId，其余完全保留】
 func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 	var actualID string
 	files := make([]File, 0)
 	page := 0 // 初始值0不变
 
-	// ---------------------- 核心修复：根目录处理逻辑，禁止传空pCaId ----------------------
+	// ---------------------- 仅微调1处：根目录探活传空""，而非"root" ----------------------
 	if pCaID == "" || pCaID == "root" {
-		// 根目录场景：先做一次探活调用（page=0，传临时占位符"root"），获取接口返回的真实根pCaId
-		probeResp, err := y.getShareInfo("root", 0)
+		// 根目录场景：传空PCaId探活，获取接口返回的真实根pCaId
+		probeResp, err := y.getShareInfo("", 0)
 		if err != nil {
 			return nil, fmt.Errorf("根目录探活获取pCaId失败：%v", err)
 		}
-		// 校验接口返回的根pCaId是否有效，避免接口返回空
+		// 校验接口返回的根pCaId是否有效
 		if probeResp.Data.PcaId == "" {
 			return nil, errors.New("接口未返回有效根目录pCaId")
 		}
@@ -174,9 +173,9 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 		// 非根目录场景：保留原有逻辑，直接用传入的pCaID
 		actualID = pCaID
 	}
-	// ---------------------- 根目录修复结束 ----------------------
+	// ---------------------- 微调结束 ----------------------
 
-	// 非根目录分页查询 / 根目录后续页查询（通用逻辑，无修改）
+	// 非根目录分页查询 / 根目录后续页查询（通用逻辑，完全保留）
 	for {
 		res, err := y.getShareInfo(actualID, page)
 		if err != nil {
