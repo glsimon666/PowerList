@@ -15,7 +15,7 @@ type Addition struct {
 
 var config = driver.Config{
 	Name:        "139GroupLink",
-	OnlyProxy:   true,
+	OnlyProxy:   false,
 	NoUpload:    true,
 	NoOverwriteUpload: true,
 	DefaultRoot: "root",
