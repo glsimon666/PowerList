@@ -38,9 +38,14 @@ func (d *Yun139GroupLink) Config() driver.Config {
 	return config
 }
 
-// 修改：GetStorage返回*model.Storage（指针类型），匹配driver.Driver接口要求
+// GetStorage 返回*model.Storage（指针类型），匹配driver.Driver接口要求
 func (d *Yun139GroupLink) GetStorage() *model.Storage {
 	return &d.Storage
+}
+
+// 新增：实现Driver接口必需的SetStorage方法，简单赋值即可
+func (d *Yun139GroupLink) SetStorage(s *model.Storage) {
+	d.Storage = *s
 }
 
 // 初始化注册驱动
