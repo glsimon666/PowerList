@@ -2,7 +2,6 @@ package _139_grouplink
 
 import (
 	"context"
-	"encoding/json" // 新增：解决undefined: json
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -92,8 +91,8 @@ func (d *Yun139GroupLink) myLink(ctx context.Context, file model.Obj) (*model.Li
 	yun139 := storage.(*_139.Yun139)
 	log.Infof("[%v] 获取139分组链接文件直链 %v %v", yun139.ID, file.GetName(), file.GetID())
 
-	// 调用139Yun驱动的直链逻辑
-	url, err := yun139.GetDownloadUrl(ctx, file.GetID())
+	// 修改：替换为139驱动实际的直链方法GetLink，补充ctx参数
+	url, err := yun139.GetLink(ctx, file.GetID())
 	if err != nil {
 		return nil, err
 	}
@@ -106,4 +105,3 @@ func (d *Yun139GroupLink) myLink(ctx context.Context, file model.Obj) (*model.Li
 		PartSize:    yun139.ChunkSize,
 	}, nil
 }
-
