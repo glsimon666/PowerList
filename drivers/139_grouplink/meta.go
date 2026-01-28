@@ -19,6 +19,8 @@ var config = driver.Config{
 	NoUpload:    true,
 	NoOverwriteUpload: true,
 	DefaultRoot: "root",
+	NoChunk:     true,                 // 新增：禁用框架分块下载（关键1）
+	NoRange:     true,                 // 新增：禁用框架Range范围请求（关键2，双重保障）
 }
 
 type Yun139GroupLink struct {
