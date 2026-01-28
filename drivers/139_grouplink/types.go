@@ -107,12 +107,12 @@ func (f File) GetHash() utils.HashInfo {
 func fileToObj(src Assets) File {
 	parsedTime, _ := time.Parse("20060102150405", src.UdTime)
 	return File{
-		ID:        src.AssetsId,
-		Name:      src.AssetsName,
-		Size:      src.CoSize,
-		Path:      src.Path,
-		IsDirFlag: false,
-		Time:      parsedTime,
-		URL:       src.PresentURL,
+		ID:        src.AssetsId,       // 保留：文件唯一ID，供下载接口使用
+		Name:      src.AssetsName,     // 保留：文件名
+		Size:      0,                  // 修正：列表接口返回0，置空避免框架误判
+		Path:      src.Path,           // 保留：文件路径
+		IsDirFlag: false,              // 保留：非目录
+		Time:      parsedTime,         // 保留：修改时间
+		URL:       "",                 // 修正：清空无效的presentURL，框架会从GetDownloadUrl获取真实直链
 	}
 }
