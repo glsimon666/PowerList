@@ -109,8 +109,8 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 	var resp GetOutLinkInfoResp
 	size := 200 // 每页条数不变
 	// 分页计算：从0开始，左闭右闭区间，贴合接口规范
-	start := page * size
-	end := (page + 1) * size - 1
+	start := page*size + 1 // page=0 → start=1（第一页起始，符合接口要求）
+	end := (page + 1) * size // page=0 → end=200（第一页结束，左闭右开，适配接口）
 
 	reqBody := GetOutLinkInfoReq{
 		LinkID: y.ShareId,
