@@ -15,23 +15,24 @@ import (
 const apiBase = "https://share-kd-njs.yun.139.com/yun-share/general/IOutLink/"
 var idx int32 = 0
 
-// ---------------------- grouplink专属下载接口 结构体 ----------------------
+// ---------------------- grouplink专属下载接口 结构体【终极修复：完全对齐抓包】 ----------------------
+// GetDownloadUrlReq 下载接口请求体：和抓包一字不差，3个必传参数
 type GetDownloadUrlReq struct {
-	LinkID  string `json:"linkID"`
-	CoIDLst CoIDLst `json:"coIDLst"`
+	UserDomainId string `json:"userDomainId"` // 分享者用户ID，探活获取
+	LinkId       string `json:"linkId"`       // 分组链接ID，小写l，和抓包一致
+	AssetsId     string `json:"assetsId"`     // 文件ID，和抓包一致，无嵌套
 }
-type CoIDLst struct {
-	Item []string `json:"item"`
-}
+// GetDownloadUrlResp 下载接口响应体：核心解析downLoadUrl，和抓包一字不差
 type GetDownloadUrlResp struct {
 	Success bool   `json:"success"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
 	Data    struct {
-		DownloadURL string `json:"downloadURL"`
+		DownLoadUrl   string `json:"downLoadUrl"`   // 核心高速直链，和抓包完全一致
+		CdnDownLoadUrl string `json:"cdnDownLoadUrl"`// 备用CDN直链，可选解析
 	} `json:"data"`
 }
-// ---------------------- 结构体结束 ----------------------
+// ---------------------- 结构体修复结束 ----------------------
 
 // httpPost 封装POST请求（保留auth参数，鉴权开关）【完全保留，一字不改】
 func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool) ([]byte, error) {
@@ -73,38 +74,46 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 	return res.Body(), nil
 }
 
-// getDownloadUrl 专属下载接口【完全保留，一字不改】
+// getDownloadUrl 专属下载接口【终极修复：对齐抓包请求/响应，保留所有正确逻辑】
 func (y *Yun139GroupLink) getDownloadUrl(fid string) (string, error) {
+	// 校验userDomainId是否有效（探活时已获取，为空则直接报错）
+	if y.UserDomainId == "" {
+		return "", errors.New("userDomainId未初始化，请先执行根目录探活")
+	}
+	// 构造抓包级合法请求体，3个参数完全对齐
 	req := GetDownloadUrlReq{
-		LinkID: y.ShareId,
-		CoIDLst: CoIDLst{
-			Item: []string{fid},
-		},
+		UserDomainId: y.UserDomainId, // 探活保存的分享者用户ID
+		LinkId:       y.ShareId,      // 分组链接ID
+		AssetsId:     fid,            // 单个文件ID，直接传入，无嵌套
 	}
 
+	// 原有请求逻辑完全保留（auth=true带鉴权，正确）
 	respBody, err := y.httpPost("getDownloadUrl", req, true)
 	if err != nil {
 		return "", fmt.Errorf("下载接口请求失败：%v", err)
 	}
 
+	// 原有解析逻辑保留，仅修改字段名匹配
 	var resp GetDownloadUrlResp
 	if err := json.Unmarshal(respBody, &resp); err != nil {
 		return "", fmt.Errorf("下载响应解析失败：%v，body：%s", err, string(respBody))
 	}
 
+	// 原有接口错误判断逻辑保留（和列表接口一致，正确）
 	if !resp.Success || resp.Code != "0000" {
 		return "", fmt.Errorf("下载接口返回错误：%s（码：%s）", resp.Message, resp.Code)
 	}
 
-	if resp.Data.DownloadURL == "" {
+	// 核心：解析抓包的downLoadUrl，而非原错误的DownloadURL
+	if resp.Data.DownLoadUrl == "" {
 		return "", errors.New("下载接口未返回有效高速直链")
 	}
 
-	log.Debugf("grouplink专属接口获取高速直链成功：%s", resp.Data.DownloadURL)
-	return resp.Data.DownloadURL, nil
+	log.Debugf("grouplink专属接口获取高速直链成功：%s", resp.Data.DownLoadUrl)
+	return resp.Data.DownLoadUrl, nil
 }
 
-// getShareInfo 调用getOutLinkInfo【终极修复：适配新的请求参数，删除错误的bNum/eNum】
+// getShareInfo 调用getOutLinkInfo【完全保留上一轮修复后的代码，一字不改】
 func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoResp, error) {
 	var resp GetOutLinkInfoResp
 	// 构造抓包的固定参数，完全对齐接口要求
@@ -138,13 +147,12 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 	return resp, nil
 }
 
-// list 获取文件列表【仅微调1处：探活传空PCaId，其余完全保留】
+// list 获取文件列表【仅新增1行：保存userDomainId，其余完全保留上一轮修复代码】
 func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 	var actualID string
 	files := make([]File, 0)
 	page := 0 // 初始值0不变
 
-	// ---------------------- 仅微调1处：根目录探活传空""，而非"root" ----------------------
 	if pCaID == "" || pCaID == "root" {
 		// 根目录场景：传空PCaId探活，获取接口返回的真实根pCaId
 		probeResp, err := y.getShareInfo("", 0)
@@ -156,7 +164,10 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 			return nil, errors.New("接口未返回有效根目录pCaId")
 		}
 		actualID = probeResp.Data.PcaId // 用接口返回的真实pCaId作为后续查询的ID
-		log.Debugf("根目录探活成功，获取真实pCaId：%s", actualID)
+		// ---------------------- 新增1行：保存userDomainId，从outLink.ownerUserId获取 ----------------------
+		y.UserDomainId = probeResp.Data.OutLink.OwnerUserId
+		// ----------------------------------------------------------------------------------------
+		log.Debugf("根目录探活成功，获取真实pCaId：%s，userDomainId：%s", actualID, y.UserDomainId)
 
 		// 把探活调用的第一页数据直接加入文件列表，避免重复查询
 		for _, asset := range probeResp.Data.AssetsList {
@@ -173,7 +184,6 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 		// 非根目录场景：保留原有逻辑，直接用传入的pCaID
 		actualID = pCaID
 	}
-	// ---------------------- 微调结束 ----------------------
 
 	// 非根目录分页查询 / 根目录后续页查询（通用逻辑，完全保留）
 	for {
