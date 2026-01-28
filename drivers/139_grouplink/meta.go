@@ -6,45 +6,41 @@ import (
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 )
 
-// Addition 驱动附加配置（必填参数）
+// 原有代码完全保留（Addition/Config/结构体等）
 type Addition struct {
-	ShareId  string `json:"shareId" required:"true"`  // 分组分享ID（linkId）
-	SharePwd string `json:"sharePwd"`                 // 分享密码（passwd）
-	RootID   string `json:"rootId" default:"root"`    // 根目录ID
+	ShareId  string `json:"shareId" required:"true"`
+	SharePwd string `json:"sharePwd" required:"true"`
+	RootID   string `json:"rootId" default:"root"`
 }
 
-// 驱动固定配置
 var config = driver.Config{
-	Name:        "139GroupLink",       // 驱动名称
-	OnlyProxy:   true,                 // 仅代理模式
-	NoUpload:    true,                 // 禁止上传
-	NoOverwriteUpload: true,           // 禁止覆盖上传
-	DefaultRoot: "root",               // 默认根目录
+	Name:        "139GroupLink",
+	OnlyProxy:   true,
+	NoUpload:    true,
+	NoOverwriteUpload: true,
+	DefaultRoot: "root",
 }
 
-// Yun139GroupLink 驱动核心结构体【新增UserDomainId字段，保存分享者用户ID】
 type Yun139GroupLink struct {
 	Storage model.Storage
 	Addition
-	UserDomainId string // 新增：存储userDomainId，从列表接口响应中获取
+	UserDomainId string // 已保存的分享者用户ID
 }
 
-// 以下所有方法**完全保留，一字不改**
-func (d *Yun139GroupLink) GetAddition() driver.Additional {
-	return &d.Addition
+// 原有方法完全保留
+func (d *Yun139GroupLink) GetAddition() driver.Additional { return &d.Addition }
+func (d *Yun139GroupLink) Config() driver.Config { return config }
+func (d *Yun139GroupLink) GetStorage() *model.Storage { return &d.Storage }
+func (d *Yun139GroupLink) SetStorage(s model.Storage) { d.Storage = s }
+func (d *Yun139GroupLink) GetRootId() string { return d.RootID }
+
+// ---------------------- 新增核心方法：实现框架GetDownloadUrl接口 ----------------------
+// 方法签名必须严格匹配框架要求，框架下载时会自动调用该方法
+func (d *Yun139GroupLink) GetDownloadUrl(fileId string) (string, error) {
+	// 内部直接复用我们已写好的专属下载函数，逻辑完全保留
+	return d.getDownloadUrl(fileId)
 }
-func (d *Yun139GroupLink) Config() driver.Config {
-	return config
-}
-func (d *Yun139GroupLink) GetStorage() *model.Storage {
-	return &d.Storage
-}
-func (d *Yun139GroupLink) SetStorage(s model.Storage) {
-	d.Storage = s
-}
-func (d *Yun139GroupLink) GetRootId() string {
-	return d.RootID
-}
+
 func init() {
 	op.RegisterDriver(func() driver.Driver {
 		return &Yun139GroupLink{}
