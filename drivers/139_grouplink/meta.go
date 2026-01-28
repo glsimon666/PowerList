@@ -22,38 +22,29 @@ var config = driver.Config{
 	DefaultRoot: "root",               // 默认根目录
 }
 
-// Yun139GroupLink 驱动核心结构体
+// Yun139GroupLink 驱动核心结构体【新增UserDomainId字段，保存分享者用户ID】
 type Yun139GroupLink struct {
 	Storage model.Storage
 	Addition
+	UserDomainId string // 新增：存储userDomainId，从列表接口响应中获取
 }
 
-// GetAddition 返回驱动附加配置
+// 以下所有方法**完全保留，一字不改**
 func (d *Yun139GroupLink) GetAddition() driver.Additional {
 	return &d.Addition
 }
-
-// Config 返回驱动配置
 func (d *Yun139GroupLink) Config() driver.Config {
 	return config
 }
-
-// GetStorage 返回*model.Storage（指针类型），匹配driver.Driver接口要求
 func (d *Yun139GroupLink) GetStorage() *model.Storage {
 	return &d.Storage
 }
-
-// SetStorage 参数改为值类型model.Storage（接口要求），直接赋值即可
 func (d *Yun139GroupLink) SetStorage(s model.Storage) {
 	d.Storage = s
 }
-
-// 新增：实现IRootId根目录接口（框架挂载必需），返回配置的RootID（默认root）
 func (d *Yun139GroupLink) GetRootId() string {
 	return d.RootID
 }
-
-// 初始化注册驱动
 func init() {
 	op.RegisterDriver(func() driver.Driver {
 		return &Yun139GroupLink{}
