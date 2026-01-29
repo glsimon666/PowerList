@@ -3,19 +3,18 @@ package _139_grouplink
 import (
 	"encoding/json"
 	"errors"
-	"sync/atomic" // 新增：原子操作，和139share一致
+	"sync/atomic" // 原子操作，多账号轮询协程安全
 	log "github.com/sirupsen/logrus"
-	_139 "github.com/OpenListTeam/OpenList/v4/drivers/139" // 139Yun驱动依赖
+	_139 "github.com/OpenListTeam/OpenList/v4/drivers/139"
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 	"net/http"
-	"time"
 )
 
 // 接口基础地址
 const apiBase = "https://share-kd-njs.yun.139.com/yun-share/general/IOutLink/"
 
-// 新增：原子化idx，和139share完全一致（多账号轮询、协程安全）
+// 原子化idx，和139share一致（多账号轮询、协程安全）
 var idx int32 = 0
 
 // httpPost 封装POST请求（保留auth参数，鉴权开关）
@@ -23,13 +22,15 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 	u := apiBase + pathname
 	req := base.RestyClient.R()
 
-	// 固定请求头（匹配139云盘接口要求）
+	// 设置请求头（匹配接口要求）
 	req.SetHeaders(map[string]string{
-		"Content-Type":    "application/json;charset=utf-8",
-		"Referer":         "https://yun.139.com/",
-		"User-Agent":      "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
-		"Origin":          "https://yun.139.com",
-		"x-share-channel": "0102",
+		"Content-Type":     "application/json;charset=utf-8",
+		"Referer":          "https://yun.139.com/",
+		"User-Agent":       "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0",
+		"Origin":           "https://yun.139.com",
+		"x-share-channel":  "0102",
+		"hcy-cool-flag":    "1",
+		"x-deviceinfo":     "||3|12.27.0|chrome|131.0.0.0|5c7c68368f048245e1ce47f1c0f8f2d0||windows 10|1536X695|zh-CN|||",
 	})
 
 	// 鉴权逻辑：完全参照139share（仅auth=true时添加）
@@ -38,9 +39,8 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 		if driver != nil {
 			yun139 := driver.(*_139.Yun139)
 			req.SetHeader("Authorization", "Basic "+yun139.Authorization)
-			log.Debugf("已为请求添加139Yun鉴权头，账号：%s", yun139.Account)
 		} else {
-			log.Warn("未找到配置的139Yun账号，无法添加鉴权头，将无法获取高速下载链接")
+			log.Warn("未找到139Yun驱动，无法添加Authorization鉴权头")
 		}
 	}
 
@@ -54,7 +54,7 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 	// 执行请求
 	res, err := req.Execute(http.MethodPost, u)
 	if err != nil {
-		log.Warnf("HTTP请求失败: %v, url: %s", err, u)
+		log.Warnf("HTTP请求失败: %v", err)
 		return nil, err
 	}
 
@@ -64,7 +64,7 @@ func (y *Yun139GroupLink) httpPost(pathname string, data interface{}, auth bool)
 // getShareInfo 调用getOutLinkInfo接口获取分享信息【无鉴权，和139share一致】
 func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoResp, error) {
 	var resp GetOutLinkInfoResp
-	size := 200 // 每页条数，和139share一致
+	size := 200 // 每页条数
 	start := page*size + 1
 	end := (page + 1) * size
 
@@ -77,7 +77,7 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 		ENum:   end,
 	}
 
-	// 调用接口：最后一个参数设为false【无鉴权，和139share完全一致】
+	// 调用接口：无鉴权（false），和139share一致
 	body, err := y.httpPost("getOutLinkInfo", reqBody, false)
 	if err != nil {
 		return resp, err
@@ -97,7 +97,7 @@ func (y *Yun139GroupLink) getShareInfo(pCaID string, page int) (GetOutLinkInfoRe
 	return resp, nil
 }
 
-// list 获取分享文件列表（分页）【无鉴权，基础能力】
+// list 获取分享文件列表（分页）
 func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 	actualID := pCaID
 	if pCaID == "" || pCaID == "root" {
@@ -108,6 +108,7 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 	page := 0
 
 	for {
+		// 调用接口获取分页数据
 		res, err := y.getShareInfo(actualID, page)
 		if err != nil {
 			return nil, err
@@ -126,7 +127,7 @@ func (y *Yun139GroupLink) list(pCaID string) ([]File, error) {
 		page++
 	}
 
-	log.Debugf("获取到%d个分享文件（无鉴权）", len(files))
+	log.Debugf("获取到%d个文件", len(files))
 	return files, nil
 }
 

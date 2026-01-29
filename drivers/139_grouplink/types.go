@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
-	"time"
 )
 
 // GetOutLinkInfoReq 接口请求体
@@ -93,6 +92,11 @@ func (f File) IsDir() bool {
 }
 
 func (f File) ModTime() time.Time {
+	return f.Time
+}
+
+// 新增：实现model.Obj必需的CreateTime方法（解决编译错误）
+func (f File) CreateTime() time.Time {
 	return f.Time
 }
 
